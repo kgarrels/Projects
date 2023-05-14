@@ -13,10 +13,10 @@
 //
 // Accelerartion using the Teensy 4.1 USB UART
 //  - Open a UART terminal to the Teensy 4.1 board. You can use the Arduino GUI Tools --> Serial Monitor or any other terminal emulator
-//  - Simply send a number over the UART to the MCL65 board for the acceletaion mode desired
+//  - Simply send a number over the UART to the MCL65 board for the acceletaion  desired
 //      Example:  press 3 for acceletaion moode 3
 //
-// Acceleration mode may also be hard-coded or the accelerated address ranges can be changed in the internal_address_check procedure below
+// Acceleration  may also be hard-coded or the accelerated address ranges can be changed in the internal_address_check procedure below
 //
 //
 //------------------------------------------------------------------------
@@ -28,7 +28,7 @@
 // Initial revision
 //
 // Revision 2 9/22/2021
-// Added methods to change acceleration modes
+// Added methods to change acceleration s
 //
 //
 //------------------------------------------------------------------------
@@ -103,6 +103,10 @@
 #define PIN_DATAOUT7        4 
 #define PIN_DATAOUT_OE_n    3 
 
+const int ledPin = 13;
+
+
+
 
 // 6502 Flags
 //
@@ -139,7 +143,7 @@ uint8_t   assert_sync=0;
 uint8_t   global_temp=0;
 uint8_t   last_access_internal_RAM=0;
 uint8_t   rx_byte_state=0;
-uint8_t   mode=1;
+uint8_t   mode=0;
 uint8_t   internal_RAM[65536];
 
 uint16_t  register_pc=0;
@@ -198,7 +202,9 @@ void setup() {
   pinMode(PIN_DATAOUT6,    OUTPUT); 
   pinMode(PIN_DATAOUT7,    OUTPUT);
   pinMode(PIN_DATAOUT_OE_n,  OUTPUT); 
-  
+
+  // initialize the digital pin as an output.
+  pinMode(ledPin, OUTPUT);
   Serial.begin(9600);
 
 }
@@ -221,14 +227,16 @@ void setup() {
 //          0x3 - All read and write accesses use accelerated internal memory 
 // ----------------------------------------------------------
 inline uint8_t internal_address_check(int32_t local_address) {
+
+/*
   
-  if ( (local_address>=0x0000) && (local_address <0x0400))   return mode;   //  6502 ZeroPage and Stack
-  if ( (local_address>=0x0400) && (local_address <0x0C00))   return 0x1;    //   
-  if ( (local_address>=0x0C00) && (local_address <0x2000))   return 0x1;    //   
-  if ( (local_address>=0x2000) && (local_address <0x6000))   return 0x1;    //   
+  if ( (local_address>=0x0000) && (local_address <0x0400))   return 0x0;   //  6502 ZeroPage and Stack
+  if ( (local_address>=0x0400) && (local_address <0x0C00))   return 0x0;    //   
+  if ( (local_address>=0x0C00) && (local_address <0x2000))   return 0x0;    //   
+  if ( (local_address>=0x2000) && (local_address <0x6000))   return 0x0;    //   
   if ( (local_address>=0x6000) && (local_address <0xC000))   return 0x0;    //   
   if ( (local_address>=0xD000) && (local_address <=0xFFFF))  return 0x0;    //   
-    
+*/    
     
   return 0x0;
 } 
@@ -262,7 +270,7 @@ inline void wait_for_CLK_rising_edge() {
     direct_nmi      = (GPIO6_data&0x00200000) >> 21;  // Teensy 4.1 Pin-41  GPIO6_DR[21]     NMI
     
     direct_datain = d76 | d5 | d4 | d3 | d2 | d10;
-    
+      
     return; 
 }
 
@@ -316,8 +324,16 @@ inline void send_address(uint32_t local_address) {
 // Send the address for a read cyle
 // -------------------------------------------------
 inline void start_read(uint32_t local_address) {
-  
+
+
   current_address = local_address; 
+
+/*
+Serial.print("enter start_read: ");
+Serial.print(current_address, HEX);
+Serial.print("\n");
+*/
+
    
     if (internal_address_check(current_address)>0x1)  { 
       //last_access_internal_RAM=1;
@@ -340,6 +356,8 @@ inline void start_read(uint32_t local_address) {
 // On the rising CLK edge, read in the data
 // -------------------------------------------------
 inline uint8_t finish_read_byte() {
+
+
   
   if (internal_address_check(current_address)>0x1)  {
     last_access_internal_RAM=1;
@@ -354,8 +372,18 @@ inline uint8_t finish_read_byte() {
        do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active 
                       
        if (internal_address_check(current_address)>0x0)  {  return internal_RAM[current_address];  }
-       else                                              {  return direct_datain;                  }
+       else {  
+        Serial.print("finish_read_byte: ");
+        Serial.print(current_address, HEX);
+        Serial.print(" ");
+        Serial.print(direct_datain, HEX);
+        Serial.print("\n");
+
+        return direct_datain;                  
+       }
     }
+
+
 }
   
   
@@ -377,7 +405,14 @@ inline uint8_t read_byte(uint16_t local_address) {
        do {  wait_for_CLK_rising_edge();  }  while (direct_ready_n == 0x1);  // Delay a clock cycle until ready is active 
 
        if (internal_address_check(current_address)>0x0)  {  return internal_RAM[current_address];  }
-       else                                              {  return direct_datain;                  }
+       else {  
+        Serial.print("       read_byte: ");
+        Serial.print(local_address, HEX);
+        Serial.print(" ");
+        Serial.print(direct_datain, HEX);
+        Serial.print("\n");
+        return direct_datain;                  
+       }
      }
 } 
 
@@ -680,20 +715,22 @@ void Double_WriteBack(uint8_t local_data)  {
 // -------------------------------------------------
 void reset_sequence() {
     uint16_t temp1, temp2;
-       
+
+    Serial.print("enter reset_sequence\n");
+
     while (digitalReadFast(PIN_RESET)!=0) {}                        // Stay here until RESET deasserts
             
-                
     digitalWriteFast(PIN_RDWR_n,  0x1);         
     digitalWriteFast(PIN_DATAOUT_OE_n,  0x1 );            
             
+
             
     temp1 = read_byte(register_pc);                                 // Address ??
     temp1 = read_byte(register_pc+1);                               // Address ?? + 1
     temp1 = read_byte(register_sp_fixed);                           // Address SP
     temp1 = read_byte(register_sp_fixed-1);                         // Address SP - 1
     temp1 = read_byte(register_sp_fixed-2);                         // Address SP - 2
-                
+              
     temp1 = read_byte(0xFFFC);                                      // Fetch Vector PCL
     temp2 = read_byte(0xFFFD);                                      // Fetch Vector PCH
                 
@@ -713,6 +750,9 @@ void reset_sequence() {
 // -------------------------------------------------
 void nmi_handler() {
     uint16_t temp1, temp2;
+
+    Serial.print("NMI\n");
+
     
     wait_for_CLK_rising_edge();                                     // Begin processing on next CLK edge
     
@@ -741,7 +781,9 @@ void nmi_handler() {
 // -------------------------------------------------
 void irq_handler(uint8_t opcode_is_brk) {
     uint16_t temp1, temp2;
-    
+
+    Serial.print("IRQ\n");
+   
     wait_for_CLK_rising_edge();                                     // Begin processing on next CLK edge
                         
     register_flags = register_flags | 0x20;                         // Set the flag[5]          
@@ -1773,49 +1815,76 @@ void opcode_0xAB() {  Fetch_Immediate();    Begin_Fetch_Next_Opcode(); return;  
  void loop() {
   
   //setup();
+
+  digitalWrite(ledPin, HIGH);   // set the LED on
+
   
   // Give Teensy 4.1 a moment
-  delay (50);
+  delay (150);
   wait_for_CLK_rising_edge();
   wait_for_CLK_rising_edge();
   wait_for_CLK_rising_edge();
-
 
   reset_sequence();
 
-
+  read_byte(0xFCD1);
+   
   while (1) {
    
-      if (direct_reset==1) reset_sequence();
-
+     if (direct_reset==1) reset_sequence();
 
 	  // Set Acceleration using UART receive characters
 	  // Send the numbers 0,1,2,3 from the host through a serial terminal to the MCL65+
-	  // for acceleration modes 0,1,2,3
+	  // for acceleration s 0,1,2,3
 	  //
+    /*
       if (Serial.available() ) { 
         incomingByte = Serial.read();   
+/*
+        Serial.print("got key: ");
+        Serial.print(incomingByte);
+        Serial.print("\n");
+
         switch (incomingByte){
           case 48: mode=0;  break;
           case 49: mode=1;  break;
           case 50: mode=2;  break;
           case 51: mode=3;  break;
+         
         }
       }
+*/
 
       
       // Poll for NMI and IRQ
       //
-      if (nmi_n_old==0 && direct_nmi==1)        nmi_handler();       
+      //if (nmi_n_old==0 && direct_nmi==1)        nmi_handler();       
       nmi_n_old = direct_nmi;                                        
-      if (direct_irq==0x1  && (flag_i)==0x0)    irq_handler(0x0);   
+      //if (direct_irq==0x1  && (flag_i)==0x0)    irq_handler(0x0);   
+     
+/*
+ //halt
+    for(;;) {
+      digitalWrite(ledPin, HIGH);   // set the LED on
+      delay(200);                  // wait for a second
+      digitalWrite(ledPin, LOW);    // set the LED off
+      delay(200);        
+    }
+*/
+      
 
     
       next_instruction = finish_read_byte();  
+      Serial.print("next instruction: ");
+      Serial.print(next_instruction, HEX);
+      Serial.print("\n");
+      
+      
+      digitalWrite(ledPin, LOW);   // set the LED off
+
       assert_sync=0;
       
       switch (next_instruction){
-          
         case 0x00:   irq_handler(0x1); break;  // BRK - Break
         case 0x01:   opcode_0x01();    break;  // OR - Indexed Indirect X
         case 0x02:   opcode_0x02();    break;  // JAM

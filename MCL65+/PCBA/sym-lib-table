@@ -1,3 +1,4 @@
 (sym_lib_table
-  (lib (name 65xx)(type Legacy)(uri Z:/Ted/projs/MCL65/PCB_MCL65+/65xx.lib)(options "")(descr ""))
+  (lib (name "65xx")(type "Legacy")(uri "Z:/Ted/projs/MCL65/PCB_MCL65+/65xx.lib")(options "")(descr ""))
+  (lib (name "MCL65+-rescue")(type "Legacy")(uri "${KIPRJMOD}/MCL65+-rescue.lib")(options "")(descr ""))
 )
